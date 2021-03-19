@@ -1,0 +1,66 @@
+{
+  "mode": "Loose",
+  "comments": "//",
+  "space": " ",
+  "arrayDelimiter": ",",
+  "optionsStart": "[",
+  "optionsEnd": "]",
+  "optionDetailStart": "(",
+  "optionDetailEnd": ")",
+  "moreOrLess": "+",
+  "range": "-",
+  "required": "*",
+  "propertyDelimiter": "\n",
+  "snippetStart": "...",
+  "skip": "\r",
+  "properties": [
+    {
+      "description": "TypePropertyDescription",
+      "identifier": null
+    },
+    {
+      "description": "SnippetTypePropertyDescription",
+      "identifier": null
+    },
+    {
+      "description": "LinkedItemsPropertyDescription",
+      "identifier": null
+    },
+    {
+      "description": "AssetPropertyDescription",
+      "identifier": "Asset"
+    },
+    {
+      "description": "TextPropertyDescription",
+      "identifier": "Text"
+    },
+    {
+      "description": "MultipleChoicePropertyDescription",
+      "identifier": "MultipleChoice"
+    },
+    {
+      "description": "SingleChoicePropertyDescription",
+      "identifier": "SingleChoice"
+    },
+    {
+      "description": "DatePropertyDescription",
+      "identifier": "Date"
+    },
+    {
+      "description": "NumberPropertyDescription",
+      "identifier": "Number"
+    },
+    {
+      "description": "RichTextPropertyDescription",
+      "identifier": "RichText"
+    },
+    {
+      "description": "CustomPropertyDescription",
+      "identifier": "Custom"
+    }
+  ],
+  "noPropertyFallback": "LinkedItemsPropertyDescription",
+  "noOptionsFallback": "TypePropertyDescription",
+  "snippetType": "SnippetTypePropertyDescription",
+  "typeStart": "TypePropertyDescription"
+}

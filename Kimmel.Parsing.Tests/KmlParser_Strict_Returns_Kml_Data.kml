@@ -1,0 +1,87 @@
+﻿Type
+------------------------------------
+Type Type
+------------------------------------
+Type Type
+...Type2
+
+Type2
+------------------------------------
+Course 
+  ...Learnable
+  Text[*] Name
+  LearnableLink[1] Linked learnable
+  
+Learnable
+  Text[*] Name2
+  Date[] Label
+  Date[] label
+  RichText[p,ol] label
+  MultipleChoice[Option 1,*] MultipleChoice
+  
+LearnableLink Link
+  Text[] label
+------------------------------------
+Type
+Text[*] Text
+------------------------------------
+Type
+Text[] Text
+------------------------------------
+Type
+Date[*] Date
+------------------------------------
+Type
+SingleChoice[Choice 1] SingleChoice
+------------------------------------
+Type
+SingleChoice[Choice 1, *] SingleChoice
+------------------------------------
+Type
+MultipleChoice[Choice 1] SingleChoice
+------------------------------------
+Type
+MultipleChoice[Choice 1, *] SingleChoice
+------------------------------------
+Type
+Child[*] Child
+Child Child type
+------------------------------------
+Type
+Child[1] Child
+Child Child type
+------------------------------------
+Type
+Child[1+] Child
+Child Child type
+------------------------------------
+Type
+Child[1-2] Child
+Child Child type
+------------------------------------
+Type
+Child[+2] Child
+Child Child type
+------------------------------------
+Type
+Child[1,*] Child
+Child Child type
+------------------------------------
+Type
+Child[1+,*] Child
+Child Child type
+------------------------------------
+Type
+Child[1-2,*] Child
+Child Child type
+------------------------------------
+Type
+Child[+2,*] Child
+Child Child type
+------------------------------------
+Type
+Text[characters(5),*]
+------------------------------------
+Type
+Custom[*] Custom
+------------------------------------
