@@ -127,12 +127,27 @@ namespace Kimmel.Parsing.Tests
 
         private static IEnumerable<object[]> KmlParser_Strict_Returns_Kml_With_Properties_Data()
         {
-            var typeStart = "Type";
+            var type1 = "Type1";
+            var type2 = "Type2";
 
-            string makeType(params string[] properties) => string.Join(Environment.NewLine, properties);
+            static string makeType(params string[] properties) => string.Join(Environment.NewLine, properties);
 
             yield return new object[] {
-                makeType(typeStart, "RichText[p,ul,tables(p),*] RichText"),
+                makeType(type1, $"{type1}[1] Property"),
+                (Func<Kml, bool>)((kml) =>
+                    {
+                        if (kml.TypeDescriptions[0].PropertyDescriptions[0] is LinkedItemsPropertyDescription propertyDescription)
+                        {
+                            return propertyDescription.LinkedTypeIds[0] == type1
+                                && propertyDescription.Minimum == 1;
+                        }
+
+                        return false;
+                    }
+                    )};
+
+            yield return new object[] {
+                makeType(type1, "RichText[p,ul,tables(p),*] RichText"),
                 (Func<Kml, bool>)((kml) =>
                     {
                         if (kml.TypeDescriptions[0].PropertyDescriptions[0] is RichTextPropertyDescription richTextPropertyDescription)
@@ -148,7 +163,24 @@ namespace Kimmel.Parsing.Tests
                     )};
 
             yield return new object[] {
-                makeType(typeStart, "RichText[images,tables(p,ul)] Property"),
+                makeType(type1, "RichText[p,*] RichText", type1, type2, Environment.NewLine, type2),
+                (Func<Kml, bool>)((kml) =>
+                    {
+                        if (kml.TypeDescriptions[0].PropertyDescriptions[0] is RichTextPropertyDescription richTextPropertyDescription)
+                        {
+                            return richTextPropertyDescription.P == true
+                                && richTextPropertyDescription.Required == true
+                                && richTextPropertyDescription.Components == true
+                                && richTextPropertyDescription.ComponentTypeIds[0] == type1
+                                && richTextPropertyDescription.ComponentTypeIds[1] == type2;
+                        }
+
+                        return false;
+                    }
+                    )};
+
+            yield return new object[] {
+                makeType(type1, "RichText[images,tables(p,ul)] Property"),
                 (Func<Kml, bool>)((kml) =>
                     {
                         if (kml.TypeDescriptions[0].PropertyDescriptions[0] is RichTextPropertyDescription propertyDescription)
@@ -163,7 +195,7 @@ namespace Kimmel.Parsing.Tests
                     )};
 
             yield return new object[] {
-                makeType(typeStart, "Asset[images] Property"),
+                makeType(type1, "Asset[images] Property"),
                 (Func<Kml, bool>)((kml) =>
                     {
                         if (kml.TypeDescriptions[0].PropertyDescriptions[0] is AssetPropertyDescription propertyDescription)
@@ -176,7 +208,7 @@ namespace Kimmel.Parsing.Tests
                     )};
 
             yield return new object[] {
-                makeType(typeStart, "Asset[images,1+] Property"),
+                makeType(type1, "Asset[images,1+] Property"),
                 (Func<Kml, bool>)((kml) =>
                     {
                         if (kml.TypeDescriptions[0].PropertyDescriptions[0] is AssetPropertyDescription propertyDescription)
@@ -190,12 +222,12 @@ namespace Kimmel.Parsing.Tests
                     )};
 
             yield return new object[] {
-                makeType(typeStart, "Type[] Property"),
+                makeType(type1, $"{type1}[] Property"),
                 (Func<Kml, bool>)((kml) =>
                     {
                         if (kml.TypeDescriptions[0].PropertyDescriptions[0] is LinkedItemsPropertyDescription propertyDescription)
                         {
-                            return propertyDescription.LinkedTypeIds[0] == "Type";
+                            return propertyDescription.LinkedTypeIds[0] == type1;
                         }
 
                         return false;
@@ -203,7 +235,7 @@ namespace Kimmel.Parsing.Tests
                     )};
 
             yield return new object[] {
-                makeType(typeStart, "MultipleChoice[Choice 1,Choice 2] Property"),
+                makeType(type1, "MultipleChoice[Choice 1,Choice 2] Property"),
                 (Func<Kml, bool>)((kml) =>
                     {
                         if (kml.TypeDescriptions[0].PropertyDescriptions[0] is MultipleChoicePropertyDescription propertyDescription)
@@ -216,13 +248,13 @@ namespace Kimmel.Parsing.Tests
                     )};
 
             yield return new object[] {
-                makeType(typeStart, "RichText[p] Property1", typeStart, "RichText[p] Property2", typeStart),
+                makeType(type1, "RichText[p] Property1", type1, "RichText[p] Property2", type1),
                 (Func<Kml, bool>)((kml) =>
                     {
                         if (kml.TypeDescriptions[0].PropertyDescriptions[0] is RichTextPropertyDescription propertyDescription)
                         {
                             return propertyDescription.Components == true
-                                && propertyDescription.ComponentTypeIds[0] == typeStart;
+                                && propertyDescription.ComponentTypeIds[0] == type1;
                         }
 
                         return false;
@@ -230,13 +262,13 @@ namespace Kimmel.Parsing.Tests
                     )};
 
             yield return new object[] {
-                makeType(typeStart, "RichText[p] Property1 ", typeStart),
+                makeType(type1, "RichText[p] Property1 ", type1),
                 (Func<Kml, bool>)((kml) =>
                     {
                         if (kml.TypeDescriptions[0].PropertyDescriptions[0] is RichTextPropertyDescription propertyDescription)
                         {
                             return propertyDescription.Components == true
-                                && propertyDescription.ComponentTypeIds[0] == typeStart;
+                                && propertyDescription.ComponentTypeIds[0] == type1;
                         }
 
                         return false;
@@ -244,7 +276,7 @@ namespace Kimmel.Parsing.Tests
                     )};
 
             yield return new object[] {
-                makeType(typeStart, "Text[words(3)] Property1"),
+                makeType(type1, "Text[words(3)] Property1"),
                 (Func<Kml, bool>)((kml) =>
                     {
                         if (kml.TypeDescriptions[0].PropertyDescriptions[0] is TextPropertyDescription propertyDescription)
@@ -257,7 +289,7 @@ namespace Kimmel.Parsing.Tests
                     )};
 
             yield return new object[] {
-                makeType(typeStart, "Text[characters(3)] Property1"),
+                makeType(type1, "Text[characters(3)] Property1"),
                 (Func<Kml, bool>)((kml) =>
                     {
                         if (kml.TypeDescriptions[0].PropertyDescriptions[0] is TextPropertyDescription propertyDescription)
@@ -270,7 +302,7 @@ namespace Kimmel.Parsing.Tests
                     )};
 
             yield return new object[] {
-                makeType(typeStart, "Text[characters(3),words(5)] Property1"),
+                makeType(type1, "Text[characters(3),words(5)] Property1"),
                 (Func<Kml, bool>)((kml) =>
                     {
                         if (kml.TypeDescriptions[0].PropertyDescriptions[0] is TextPropertyDescription propertyDescription)
@@ -284,7 +316,7 @@ namespace Kimmel.Parsing.Tests
                     )};
 
             yield return new object[] {
-                makeType(typeStart, "Text[words(3),*] Property1"),
+                makeType(type1, "Text[words(3),*] Property1"),
                 (Func<Kml, bool>)((kml) =>
                     {
                         if (kml.TypeDescriptions[0].PropertyDescriptions[0] is TextPropertyDescription propertyDescription)
@@ -298,7 +330,7 @@ namespace Kimmel.Parsing.Tests
                     )};
 
             yield return new object[] {
-                makeType(typeStart, "RichText[words(3),*] Property1"),
+                makeType(type1, "RichText[words(3),*] Property1"),
                 (Func<Kml, bool>)((kml) =>
                     {
                         if (kml.TypeDescriptions[0].PropertyDescriptions[0] is RichTextPropertyDescription propertyDescription)
