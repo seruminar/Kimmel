@@ -1,112 +1,125 @@
+<script lang="ts" context="module">
+  export type ViewMode = "object" | "array" | "primitive";
+</script>
+
 <script lang="ts">
-  import { isArray, isPlainObject, sortBy } from "lodash";
+  import { isArray, isPlainObject } from "lodash";
   import { property } from "../actions/property";
   import ChevronDown from "./chevronDown.svelte";
   import { fade, fly } from "svelte/transition";
 
   export let label: string = "";
   export let object: any;
+  export let key: any;
   export let depth: number = 1;
 
-  export let sortObjectKeys: (key: string) => any;
-  export let getObjectLabel: (key: any) => string = () => "";
+  export let getKeys: (object: any, mode: ViewMode) => string[] = (object) =>
+    Object.keys(object);
+  export let labelCallback: (
+    element: HTMLElement,
+    object: any,
+    key: string,
+    mode: ViewMode
+  ) => void;
   export let backgroundHover: string;
   export let checkedColor: string;
   export let color: string;
 
-  export let checked: boolean;
+  export let open: boolean;
+
+  let mode: ViewMode;
+
+  $: {
+    if (isArray(object)) {
+      mode = "array";
+    } else if (isPlainObject(object)) {
+      mode = "object";
+    } else {
+      mode = "primitive";
+    }
+  }
+
+  $: keys = getKeys(object, mode);
+
+  const callback = (
+    node: HTMLDivElement,
+    _: { object: any; key: string; mode: ViewMode }
+  ) => {
+    labelCallback(node, object, key, mode);
+  };
 </script>
 
-{#if isArray(object)}
-  <div
-    class="group"
-    transition:fly={{ y: -10 }}
-    use:property={["depth", `calc((${depth - 1}vw + ${depth - 1}vh) / 2)`]}
-    use:property={["backgroundHover", backgroundHover]}
-    use:property={["checkedColor", checkedColor]}
-    use:property={["color", color]}>
-    {#if object.length > 0}
-      <label transition:fade>
-        <input type="checkbox" bind:checked />
-        <div class="checkbox">
-          <ChevronDown />
-        </div>
-      </label>
-    {/if}
-    <div class="depth" />
-    {#if label !== ""}
-      <b>{label}</b>
-    {/if}
-    <span>
-      {object.length}
-    </span>
-    <div class="item" />
-  </div>
-  {#if checked}
-    {#each object as pair, index}
-      <svelte:self
-        {...$$props}
-        checked={undefined}
-        label={index + 1}
-        object={pair}
-        depth={depth + 1} />
-    {/each}
-  {/if}
-{:else if isPlainObject(object)}
-  <div
-    class="group"
-    transition:fly={{ y: -10 }}
-    use:property={["depth", `calc((${depth - 1}vw + ${depth - 1}vh) / 2)`]}
-    use:property={["backgroundHover", backgroundHover]}
-    use:property={["checkedColor", checkedColor]}
-    use:property={["color", color]}>
+<div
+  class="group"
+  transition:fly={{ y: -10 }}
+  use:property={["depth", `calc((1vw + 1vh) * ${depth - 1})`]}
+  use:property={["backgroundHover", backgroundHover]}
+  use:property={["checkedColor", checkedColor]}
+  use:property={["color", color]}>
+  {#if mode === "array" && object.length > 0}
     <label transition:fade>
-      <input type="checkbox" bind:checked />
+      <input type="checkbox" bind:checked={open} />
       <div class="checkbox">
         <ChevronDown />
       </div>
     </label>
-    <div class="depth" />
-    {#if label !== ""}
-      <b>{label}</b>
+  {:else if mode === "object" && keys.length > 0}
+    <label>
+      <input type="checkbox" bind:checked={open} />
+      <div class="checkbox">
+        <ChevronDown />
+      </div>
+    </label>
+  {:else}
+    <div class="spacer" />
+  {/if}
+  <div class="depth" />
+  {#if label !== ""}
+    <b>{label}</b>
+  {/if}
+  {#key object}
+    {#if object !== undefined}
+      <div use:callback={{ object, key, mode }} />
     {/if}
-    <span>
-      {getObjectLabel(object)}
-    </span>
-    <div class="item" />
-  </div>
-  {#if checked}
-    {#each sortBy(Object.keys(object), sortObjectKeys) as key}
+  {/key}
+  <div class="item" />
+</div>
+
+{#if open && object !== undefined && object !== null}
+  {#if mode === "array"}
+    {#each keys as key, index}
       <svelte:self
         {...$$props}
-        checked={undefined}
+        open={undefined}
+        label={index + 1}
+        object={object[key]}
+        {key}
+        depth={depth + 1} />
+    {/each}
+  {:else if mode === "object"}
+    {#each keys as key}
+      <svelte:self
+        {...$$props}
+        open={undefined}
         label={key}
         object={object[key]}
+        {key}
         depth={depth + 1} />
     {/each}
   {/if}
-{:else}
-  <div
-    class="group"
-    transition:fly={{ y: -10 }}
-    use:property={["depth", `calc((${depth - 1}vw + ${depth - 1}vh) / 2)`]}
-    use:property={["backgroundHover", backgroundHover]}
-    use:property={["checkedColor", checkedColor]}
-    use:property={["color", color]}>
-    <div class="depth" />
-    {#if label !== ""}
-      <b>{label}</b>
-    {/if}
-    <span>{object}</span>
-    <div class="item" />
-  </div>
 {/if}
 
 <style>
   .group {
     display: flex;
     min-height: calc((1vw + 1vh) * 1);
-    padding: calc((1vw + 1vh) * 0.1) 0;
+    padding: calc((1vw + 1vh) * 0.1) calc((1vw + 1vh) * 0.5)
+      calc((1vw + 1vh) * 0.1) 0;
+    align-items: center;
+    margin-bottom: calc((1vw + 1vh) * 0.1);
+    background-color: #fff;
+    border-radius: calc((1vw + 1vh) * 0.3);
+    box-shadow: 0 0 8px 0 rgb(0 0 0 / 3%);
   }
 
   .group:hover {
@@ -118,7 +131,12 @@
   }
 
   label {
-    margin: 0 calc((1vw + 1vh) * -0.75) 0 0;
+    margin: 0 calc((1vw + 1vh) * 0.2) 0;
+  }
+
+  .spacer {
+    margin: 0 calc((1vw + 1vh) * 0.2) 0;
+    width: calc((1vw + 1vh) * 0.75);
   }
 
   input[type="checkbox"] {
@@ -149,7 +167,6 @@
 
   .depth {
     width: var(--depth);
-    display: inline-block;
     margin: 0 0 0 calc((1vw + 1vh) * 0.75);
     display: table;
   }

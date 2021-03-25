@@ -6,11 +6,15 @@ namespace Kimmel.Core.Parsing
     [Serializable]
     public class ParsingException : Exception
     {
-        public ParsingException(string? message, char? current = null, int? index = null) : base(Format(message, current, index))
+        public ParsingException(string? message, char current, int index) : this(message, current.ToString(), index)
         {
         }
 
-        private static string Format(string? message, char? current, int? index)
+        public ParsingException(string? message, string? current = null, int? index = null) : base(Format(message, current, index))
+        {
+        }
+
+        private static string Format(string? message, string? current, int? index)
         {
             if (current is not null && index is not null)
             {

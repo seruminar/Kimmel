@@ -7,7 +7,7 @@
   export const openOverlay = () => {
     overlay = true;
     document.body.style.top = `-${document.body.parentElement.scrollTop}px`;
-    document.body.style.height = `height: calc(100% + ${document.body.parentElement.scrollTop}px)`;
+    document.body.style.height = `calc(100% + ${document.body.parentElement.scrollTop}px)`;
     document.body.classList.add("noscroll");
 
     if (openOverlayCallback) {
@@ -32,6 +32,7 @@
           document.body.style.top.slice(1, -2)
         );
         document.body.style.top = "";
+        document.body.style.height = "";
       }
     }}
     on:click={() => {
@@ -82,12 +83,8 @@
     margin: 0 auto;
     width: calc((1vh + 1vw) * 20);
     border-radius: calc((1vh + 1vw) * 0.5);
-    background: linear-gradient(
-      135deg,
-      hsl(22deg, 9%, 98%),
-      hsl(19deg 50% 70%)
-    );
-    color: #a75b37;
+    background: linear-gradient(135deg, #f3f4f5, #d3dff3);
+    color: #231f20;
     z-index: 1;
     padding: calc((1vh + 1vw) * 0.5);
   }

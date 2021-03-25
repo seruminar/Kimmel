@@ -133,15 +133,19 @@ namespace Kimmel.Parsing
 
             void finalizeRichTextParent()
             {
-                if (richTextParent is not null && componentTypeIdsPointer > 0)
+                if (richTextParent is not null)
                 {
-                    richTextParent.Components = true;
-                    richTextParent.ComponentTypeIds = (string[])Array.CreateInstance(typeof(string), componentTypeIdsPointer);
+                    if (componentTypeIdsPointer > 0)
+                    {
+                        richTextParent.Components = true;
+                        richTextParent.ComponentTypeIds = (string[])Array.CreateInstance(typeof(string), componentTypeIdsPointer);
 
-                    Array.Copy(componentTypeIds, richTextParent.ComponentTypeIds, componentTypeIdsPointer);
+                        Array.Copy(componentTypeIds, richTextParent.ComponentTypeIds, componentTypeIdsPointer);
+
+                        componentTypeIdsPointer = 0;
+                    }
 
                     richTextParent = null;
-                    componentTypeIdsPointer = 0;
                 }
             }
 
@@ -681,6 +685,10 @@ namespace Kimmel.Parsing
                                             goto default;
                                         }
                                     }
+                                    else if (propertyDescriptions.Count > 0)
+                                    {
+                                        propertyDescriptions.Add(new TypeEndPropertyDescription());
+                                    }
 
                                     break;
 
@@ -740,6 +748,8 @@ namespace Kimmel.Parsing
                     );
             }
 
+            propertyDescriptions.Add(new TypeEndPropertyDescription());
+
             var typeBuffer = ArrayPool<DescribesTypedProperty>.Shared.Rent(propertyDescriptions.Count);
             var typeBufferPointer = 0;
             var typeLinkedTypeIds = new HashSet<string>();
@@ -752,6 +762,25 @@ namespace Kimmel.Parsing
 
                 switch (propertyDescription)
                 {
+                    case TypeEndPropertyDescription typeEndPropertyDescription:
+                        addProperty = false;
+
+                        var typeDescription = typeDescriber.DescribeType(
+                            typeBuffer,
+                            typeBufferPointer,
+                            typeLinkedTypeIds,
+                            typeSnippetTypeIds
+                            );
+
+                        tryAddType(typeDescription);
+
+                        typeBufferPointer = 0;
+                        typeLinkedTypeIds = new HashSet<string>();
+                        typeSnippetTypeIds = new HashSet<string>();
+                        richTextStart = false;
+
+                        break;
+
                     case TypePropertyDescription typePropertyDescription:
                         if (typeBufferPointer == 0)
                         {
@@ -764,20 +793,6 @@ namespace Kimmel.Parsing
                                 addProperty = false;
                                 break;
                             }
-
-                            var typeDescription = typeDescriber.DescribeType(
-                                typeBuffer,
-                                typeBufferPointer,
-                                typeLinkedTypeIds,
-                                typeSnippetTypeIds
-                                );
-
-                            tryAddType(typeDescription);
-
-                            typeBufferPointer = 0;
-                            typeLinkedTypeIds = new HashSet<string>();
-                            typeSnippetTypeIds = new HashSet<string>();
-                            richTextStart = false;
 
                             break;
                         }
@@ -814,17 +829,6 @@ namespace Kimmel.Parsing
                 {
                     typeBuffer[typeBufferPointer++] = propertyDescription;
                 }
-            }
-
-            {
-                var typeDescription = typeDescriber.DescribeType(
-                    typeBuffer,
-                    typeBufferPointer,
-                    typeLinkedTypeIds,
-                    typeSnippetTypeIds
-                    );
-
-                tryAddType(typeDescription);
             }
 
             var finalTypeDescriptions = new List<TypeDescription>(typeDescriptions.Count);

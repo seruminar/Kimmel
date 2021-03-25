@@ -21,14 +21,13 @@
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    background: hsl(19deg 50% 90% / 65%);
-    border-radius: calc((1vh + 1vw) * 0.5);
+    background: #323a4866;
     overflow: hidden;
     cursor: wait;
   }
 
   .loading {
-    color: #a75b37;
+    color: #db3c00;
   }
 
   .letter {

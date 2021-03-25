@@ -150,7 +150,7 @@ namespace Kimmel.Parsing
                 { new OptionParsingState<RichTextPropertyDescription>(false, Options.Required.ToString().AsMemory(), description => description.Required = true) }
             };
 
-            var richTextTablesDetails = new List<OptionParsingState<RichTextPropertyDescription>>()
+            static IList<OptionParsingState<RichTextPropertyDescription>> richTextTablesDetails() => new List<OptionParsingState<RichTextPropertyDescription>>()
             {
                 { new OptionParsingState<RichTextPropertyDescription>(false, "p".AsMemory(), description => description.TablesP = true) },
                 { new OptionParsingState<RichTextPropertyDescription>(false, "b".AsMemory(), description => description.TablesB = true) },
@@ -172,20 +172,24 @@ namespace Kimmel.Parsing
                 { new DetailsParsingState<RichTextPropertyDescription>(false, "tables".AsMemory(), (description, details) => {
                     if (details is not null)
                     {
+                        description.Tables = true;
+
                         foreach (var detail in details)
                         {
                             var detailSpan = detail.Span;
                             var detailFound = false;
 
-                            for (var detailIndex = 0; detailIndex < richTextTablesDetails.Count; detailIndex++)
+                            var newRichTextTablesDetails = richTextTablesDetails();
+
+                            for (var detailIndex = 0; detailIndex < newRichTextTablesDetails.Count; detailIndex++)
                             {
-                                var targetDetail = richTextTablesDetails[detailIndex];
+                                var targetDetail = newRichTextTablesDetails[detailIndex];
 
                                 if (detailSpan.SequenceEqual(targetDetail.Option.Span))
                                 {
                                     if (targetDetail.Found)
                                     {
-                                        throw new ParsingException($"Detail '{targetDetail.Option}' already has a value.");
+                                        throw new ParsingException($"Detail '{targetDetail.Option}' already has a value.", description.Label, detailIndex);
                                     }
 
                                     targetDetail.Found = true;
@@ -435,6 +439,12 @@ namespace Kimmel.Parsing
                                     continue;
                                 }
 
+                                ParseRangeOption(describesList, option, targetRangeOption!);
+                            }
+                            break;
+
+                        case (null, null, not null) when description is DescribesList describesList:
+                            {
                                 ParseRangeOption(describesList, option, targetRangeOption!);
                             }
                             break;

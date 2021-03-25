@@ -1,13 +1,14 @@
 <script lang="ts">
   import wretch from "wretch";
-  import { debounce, replace } from "lodash";
+  import { debounce, replace, sortBy } from "lodash";
   import jwt_decode from "jwt-decode";
-  import { onMount } from "svelte";
+  import { onMount, tick } from "svelte";
   import { fade } from "svelte/transition";
   import type { TransitionConfig } from "svelte/transition";
   import {
     editorLineHighlight,
     editorOverviewRulerBackground,
+    editorGutter,
   } from "monaco-editor/esm/vs/editor/common/view/editorColorRegistry";
   import {
     editorBackground,
@@ -17,12 +18,14 @@
     scrollbarShadow,
   } from "monaco-editor/esm/vs/platform/theme/common/colorRegistry";
   import "monaco-editor/min/vs/editor/editor.main.css";
-  import type * as monaco from "monaco-editor";
+  import type { editor, languages } from "monaco-editor";
 
   import { translate, translateReady } from "../shared/stores/translate";
   import Loading from "../shared/components/loading.svelte";
   import { localStorage } from "../shared/stores/localStorage";
   import ObjectView from "../shared/components/objectView.svelte";
+  import type { ViewMode } from "../shared/components/objectView.svelte";
+  import ObjectLabel from "../shared/components/objectLabel.svelte";
   import Overlay from "../shared/components/overlay.svelte";
   import SaveToCloud from "../shared/components/saveToCloud.svelte";
 
@@ -40,7 +43,7 @@
   let ready: boolean = false;
 
   let monacoRoot: HTMLDivElement;
-  let editor: monaco.editor.IStandaloneCodeEditor;
+  let editor: editor.IStandaloneCodeEditor;
   let resizeObserver: ResizeObserver;
 
   let tips: {
@@ -72,6 +75,7 @@
 
   let projectId: string = "";
   let managementApiKey: string = "";
+  let managementApiKeyInput: HTMLInputElement;
   let managementApiKeyValid: boolean = false;
 
   let selectedTemplate: IKml;
@@ -114,8 +118,8 @@
   onMount(() => {
     db = new KmlDatabase();
 
-    translateReady.subscribe(async (ready) => {
-      if (!ready) {
+    translateReady.subscribe(async (translateReady) => {
+      if (!translateReady) {
         return;
       }
 
@@ -156,6 +160,8 @@
 
       updateTemplates = !updateTemplates;
 
+      const monaco = await import("monaco-editor");
+
       editor = monaco.editor.create(monacoRoot, {
         value: kml,
         language: languageId,
@@ -174,233 +180,246 @@
 
       resizeObserver = new ResizeObserver(() => editor.layout());
       resizeObserver.observe(monacoRoot);
+
+      monaco.editor.defineTheme(languageId, {
+        base: "vs-dark",
+        inherit: true,
+        rules: [
+          {
+            token: "property",
+            foreground: "ffc6b1",
+          },
+          {
+            token: "type",
+            foreground: "ff9d23",
+          },
+          {
+            token: "options",
+            foreground: "ffca0a",
+          },
+          {
+            token: "label",
+            foreground: "fff1ec",
+          },
+          {
+            token: "comment",
+            foreground: "98bdff",
+          },
+          {
+            token: "snippet",
+            foreground: "ff8a5d",
+          },
+          {
+            token: "bracket",
+            foreground: "ffecb5",
+          },
+        ],
+        colors: {
+          [editorBackground]: "#233450",
+          [editorGutter]: "#233450",
+          [editorOverviewRulerBackground]: "#233450",
+          [editorInactiveSelection]: "#4f5a6d",
+          [editorSelectionBackground]: "#437ad4",
+          [editorLineHighlight]: "#365382",
+          [scrollbarShadow]: "#233450",
+          [minimapBackground]: "#233450",
+        },
+      });
+
+      monaco.editor.setTheme(languageId);
+
+      monaco.languages.register({ id: languageId });
+
+      monaco.languages.setLanguageConfiguration(languageId, {
+        comments: {
+          lineComment: "//",
+        },
+        brackets: [
+          ["[", "]"],
+          ["(", ")"],
+        ],
+        autoClosingPairs: [
+          { open: "[", close: "]" },
+          { open: "(", close: ")" },
+        ],
+      });
+
+      monaco.languages.setMonarchTokensProvider(languageId, {
+        defaultToken: "invalid",
+        tokenizer: {
+          root: [
+            // property
+            [/^\s*[\w,]+(?=\[)/, "property"],
+            // type
+            [/^\s*\w+/, "type"],
+            // snippet type
+            [/\.\.\.\w+/, "snippet"],
+            // whitespace
+            { include: "@whitespace" },
+            // options
+            [/[\w,\-+* \(\)]+?(?=\])/, "options"],
+            // brackets
+            [/[\[\]]/, "bracket"],
+            // label
+            [/[\w ]+?/, "label"],
+          ],
+          whitespace: [
+            [/[ \t\r\n]+/, "white"],
+            [/\/\*/, "comment", "@comment"],
+            [/\/\/.*$/, "comment"],
+          ],
+          comment: [
+            [/[^\/*]+/, "comment"],
+            [/\/\*/, "comment", "@push"], // nested comment
+            ["\\*/", "comment", "@pop"],
+            [/[\/*]/, "comment"],
+          ],
+        },
+      });
+
+      monaco.languages.registerCompletionItemProvider(languageId, {
+        provideCompletionItems: (model, position, context) => {
+          const wordInfo = model.getWordUntilPosition(position);
+          const range = new monaco.Range(
+            position.lineNumber,
+            wordInfo.startColumn,
+            position.lineNumber,
+            wordInfo.endColumn
+          );
+
+          const getInsertText = (id: string) => id + "[${1}] ${2:label}\n$0";
+
+          const propertySuggestions = [
+            {
+              label: "asset",
+              id: "Asset",
+              documentation: "Single Asset property",
+            },
+            {
+              label: "text",
+              id: "Text",
+              documentation: "Single Text property",
+            },
+            {
+              label: "multipleChoice",
+              id: "MultipleChoice",
+              documentation: "Single Multiple ahoice property",
+            },
+            {
+              label: "singleChoice",
+              id: "SingleChoice",
+              documentation: "Single Single choice property",
+            },
+            {
+              label: "date",
+              id: "Date",
+              documentation: "Single Date property",
+            },
+            {
+              label: "number",
+              id: "Number",
+              documentation: "Single Number property",
+            },
+            {
+              label: "richText",
+              id: "RichText",
+              documentation: "Single Rich text property",
+            },
+          ];
+
+          const suggestions: languages.CompletionItem[] = [
+            {
+              label: "type",
+              kind: monaco.languages.CompletionItemKind.Class,
+              range,
+              insertText: [
+                "${1:TypeId} ${2:type label}",
+                "\t${3:Text}[${4}] ${5:text label}",
+                "\t$0",
+              ].join("\n"),
+              insertTextRules:
+                monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              documentation: "Single type with one property",
+            },
+            {
+              label: "snippet",
+              kind: monaco.languages.CompletionItemKind.Property,
+              range,
+              insertText: "...${1:Identifier}\n$0",
+              insertTextRules:
+                monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              documentation: "Single snippet type property",
+            },
+            {
+              label: "prop",
+              kind: monaco.languages.CompletionItemKind.Property,
+              range,
+              insertText: "${1:Identifier}[${2}] ${3:Label}\n$0",
+              insertTextRules:
+                monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              documentation: "Single property",
+            },
+          ];
+
+          for (const property of propertySuggestions) {
+            suggestions.push({
+              label: property.label,
+              kind: monaco.languages.CompletionItemKind.Property,
+              range,
+              insertText: getInsertText(property.id),
+              insertTextRules:
+                monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              documentation: property.documentation,
+            });
+          }
+
+          const textTokens = model.findMatches(
+            (/[\w]+/gi as unknown) as string,
+            true,
+            true,
+            false,
+            null,
+            true,
+            50
+          );
+
+          const textSuggestions: {
+            [key: string]: languages.CompletionItem;
+          } = {};
+
+          for (const token of textTokens) {
+            const match = token.matches[0];
+
+            if (wordInfo.word === match) {
+              continue;
+            }
+
+            textSuggestions[match] = {
+              label: match,
+              kind: monaco.languages.CompletionItemKind.Text,
+              range,
+              insertText: match,
+              insertTextRules:
+                monaco.languages.CompletionItemInsertTextRule.KeepWhitespace,
+            };
+          }
+
+          for (const textSuggestion in textSuggestions) {
+            suggestions.push(textSuggestions[textSuggestion]);
+          }
+
+          return { suggestions };
+        },
+      });
+
+      ready = true;
     });
-
-    configureMonaco();
-
-    ready = true;
 
     return () => {
       resizeObserver.disconnect();
       clearTimeout(tipsTimerId);
     };
   });
-
-  const configureMonaco = () => {
-    monaco.editor.defineTheme(languageId, {
-      base: "vs-dark",
-      inherit: true,
-      rules: [
-        {
-          token: "comment",
-          foreground: "f3c598",
-        },
-        {
-          token: "snippet",
-          foreground: "8fd683",
-        },
-        {
-          token: "bracket",
-          foreground: "dcc960",
-        },
-      ],
-      colors: {
-        [editorBackground]: "#38332e",
-        [scrollbarShadow]: "#221e1b",
-        [minimapBackground]: "#221e1b",
-        [editorOverviewRulerBackground]: "#221e1b",
-        [editorInactiveSelection]: "#5d524a",
-        [editorSelectionBackground]: "#221e1b",
-        [editorLineHighlight]: "#a75b3740",
-      },
-    });
-
-    monaco.editor.setTheme(languageId);
-
-    monaco.languages.register({ id: languageId });
-
-    monaco.languages.setLanguageConfiguration(languageId, {
-      comments: {
-        lineComment: "//",
-      },
-      brackets: [
-        ["[", "]"],
-        ["(", ")"],
-      ],
-      autoClosingPairs: [
-        { open: "[", close: "]" },
-        { open: "(", close: ")" },
-      ],
-    });
-
-    monaco.languages.setMonarchTokensProvider(languageId, {
-      defaultToken: "invalid",
-      tokenizer: {
-        root: [
-          // type
-          [/^\s*[\w,]+(?=\[)/, "keyword"],
-          // name
-          [/^\s*\w+/, "type.identifier"],
-          // snippet type
-          [/\.\.\.\w+/, "snippet"],
-          // whitespace
-          { include: "@whitespace" },
-          // options
-          [/[\w,\-+* \(\)]+?(?=\])/, "number"],
-          // brackets
-          [/[\[\]]/, "bracket"],
-          // label
-          [/[\w ]+?/, "string"],
-        ],
-        whitespace: [
-          [/[ \t\r\n]+/, "white"],
-          [/\/\*/, "comment", "@comment"],
-          [/\/\/.*$/, "comment"],
-        ],
-        comment: [
-          [/[^\/*]+/, "comment"],
-          [/\/\*/, "comment", "@push"], // nested comment
-          ["\\*/", "comment", "@pop"],
-          [/[\/*]/, "comment"],
-        ],
-      },
-    });
-
-    monaco.languages.registerCompletionItemProvider(languageId, {
-      provideCompletionItems: (model, position, context) => {
-        const wordInfo = model.getWordUntilPosition(position);
-        const range = new monaco.Range(
-          position.lineNumber,
-          wordInfo.startColumn,
-          position.lineNumber,
-          wordInfo.endColumn
-        );
-
-        const getInsertText = (id: string) => id + "[${1}] ${2:label}\n$0";
-
-        const propertySuggestions = [
-          {
-            label: "asset",
-            id: "Asset",
-            documentation: "Single Asset property",
-          },
-          {
-            label: "text",
-            id: "Text",
-            documentation: "Single Text property",
-          },
-          {
-            label: "multipleChoice",
-            id: "MultipleChoice",
-            documentation: "Single Multiple ahoice property",
-          },
-          {
-            label: "singleChoice",
-            id: "SingleChoice",
-            documentation: "Single Single choice property",
-          },
-          {
-            label: "date",
-            id: "Date",
-            documentation: "Single Date property",
-          },
-          {
-            label: "number",
-            id: "Number",
-            documentation: "Single Number property",
-          },
-          {
-            label: "richText",
-            id: "RichText",
-            documentation: "Single Rich text property",
-          },
-        ];
-
-        const suggestions: monaco.languages.CompletionItem[] = [
-          {
-            label: "type",
-            kind: monaco.languages.CompletionItemKind.Class,
-            range,
-            insertText: [
-              "${1:TypeId} ${2:type label}",
-              "\t${3:PropertyId}[${4}] ${5:label}",
-              "\t$0",
-            ].join("\n"),
-            insertTextRules:
-              monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-            documentation: "Single type with one property",
-          },
-          {
-            label: "snippet",
-            kind: monaco.languages.CompletionItemKind.Property,
-            range,
-            insertText: "...${1:Identifier}\n$0",
-            insertTextRules:
-              monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-            documentation: "Single snippet type property",
-          },
-          {
-            label: "prop",
-            kind: monaco.languages.CompletionItemKind.Property,
-            range,
-            insertText: "${1:Identifier}[${2}] ${3:Label}\n$0",
-            insertTextRules:
-              monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-            documentation: "Single property",
-          },
-        ];
-
-        for (const property of propertySuggestions) {
-          suggestions.push({
-            label: property.label,
-            kind: monaco.languages.CompletionItemKind.Property,
-            range,
-            insertText: getInsertText(property.id),
-            insertTextRules:
-              monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-            documentation: property.documentation,
-          });
-        }
-
-        const textTokens = model.findMatches(
-          /[\w]+/gi,
-          true,
-          true,
-          false,
-          null,
-          true,
-          50
-        );
-
-        const textSuggestions: {
-          [key: string]: monaco.languages.CompletionItem;
-        } = {};
-
-        for (const token of textTokens) {
-          const match = token.matches[0];
-
-          if (wordInfo.word === match) {
-            continue;
-          }
-
-          textSuggestions[match] = {
-            label: match,
-            kind: monaco.languages.CompletionItemKind.Text,
-            range,
-            insertText: match,
-            insertTextRules:
-              monaco.languages.CompletionItemInsertTextRule.KeepWhitespace,
-          };
-        }
-
-        for (const textSuggestion in textSuggestions) {
-          suggestions.push(textSuggestions[textSuggestion]);
-        }
-
-        return { suggestions };
-      },
-    });
-  };
 
   const tipsTimer = () => {
     clearTimeout(tipsTimerId);
@@ -584,6 +603,38 @@
     }
   };
 
+  const renderDetail = (
+    node: HTMLElement,
+    object: any,
+    key: string,
+    mode: ViewMode
+  ) => {
+    switch (mode) {
+      case "array":
+        new ObjectLabel({
+          target: node,
+          props: { label: object.length },
+        });
+        break;
+
+      case "primitive":
+        new ObjectLabel({
+          target: node,
+          props: { label: object },
+        });
+        break;
+
+      default:
+        if (object.id !== undefined || object.label !== undefined) {
+          new ObjectLabel({
+            target: node,
+            props: { label: object.id ?? object.label },
+          });
+        }
+        break;
+    }
+  };
+
   const pulse = (node: HTMLElement) => {
     const animationElement = document.createElement("animation");
 
@@ -655,28 +706,9 @@
   const t = translate(translations);
 </script>
 
-<svelte:head>
-  <title>{$t`kimmel`}</title>
-  <script>
-    var require = {
-      paths: { vs: "https://cdn.jsdelivr.net/npm/monaco-editor@0.22.3/min/vs" },
-    };
-  </script>
-  <script
-    src="https://cdn.jsdelivr.net/npm/monaco-editor@0.22.3/min/vs/loader.js"></script>
-  <script
-    src="https://cdn.jsdelivr.net/npm/monaco-editor@0.22.3/min/vs/editor/editor.main.nls.js"></script>
-  <script
-    src="https://cdn.jsdelivr.net/npm/monaco-editor@0.22.3/min/vs/editor/editor.main.js"></script>
-</svelte:head>
-
-{#if ready}
-  <h1>
-    {$t`kimmel`}
-  </h1>
-{:else}
-  <h1>&nbsp;</h1>
-{/if}
+<h1>
+  {$t`kimmel`}
+</h1>
 <section>
   {#if ready}
     <div class="overlayContext">
@@ -703,7 +735,12 @@
         {#if newTemplateName !== ""}
           <br />
           {#await db.kmls.where("name").equals(newTemplateName).toArray()}
-            <div class="group item" />
+            <div class="group item">
+              <div class="item" />
+              <div>
+                <button disabled>{$t`saveNewTemplate`}</button>
+              </div>
+            </div>
           {:then existingTemplates}
             <div class="group item">
               {#if existingTemplates.length > 0}
@@ -737,11 +774,15 @@
       </Overlay>
       <Overlay
         bind:openOverlay={openExportKontentOverlay}
-        openOverlayCallback={() => {
+        openOverlayCallback={async () => {
           managementApiKey = "";
           overlayFinished = false;
           overlayObject = undefined;
           managementApiKeyValid = false;
+
+          await tick();
+
+          managementApiKeyInput.focus();
         }}>
         {#if overlayLoading}
           <div class="overlay" out:fade><Loading /></div>
@@ -761,6 +802,7 @@
               <input
                 type="password"
                 class="item"
+                bind:this={managementApiKeyInput}
                 bind:value={managementApiKey} />
             </label>
           </div>
@@ -797,9 +839,10 @@
           <ObjectView
             label={overlayLabel}
             object={overlayObject}
-            backgroundHover={"#a75b3740"}
-            checkedColor={"#a75b37"}
-            color={"#6e4f40"} />
+            backgroundHover={"#eaeaea"}
+            checkedColor={"#db3c00"}
+            color={"#151515"}
+            labelCallback={renderDetail} />
         {/if}
       </Overlay>
     </div>
@@ -871,7 +914,7 @@
           {/if}
         </div>
       </div>
-      <div class="group column">
+      <div class="group column tips">
         <br />
         <h2>{$t`tipsHeading`}</h2>
         {#if tip}
@@ -893,43 +936,41 @@
     {#if parsedObject}
       <ObjectView
         label={parsedLabel}
-        checked={true}
+        open={true}
         object={parsedObject}
-        backgroundHover={"#a75b3740"}
-        checkedColor={"#a75b37"}
-        color={"#6e4f40"}
-        getObjectLabel={(object) => {
-          if (object.id !== undefined) {
-            return object.id;
-          } else if (object.label !== undefined) {
-            return object.label;
+        backgroundHover={"#eaeaea"}
+        checkedColor={"#db3c00"}
+        color={"#151515"}
+        labelCallback={renderDetail}
+        getKeys={(object) => {
+          if (object) {
+            return sortBy(Object.keys(object), (key) => {
+              switch (key) {
+                case "id":
+                  return 1;
+                case "type":
+                  return 2;
+                case "label":
+                  return 3;
+                case "required":
+                  return 4;
+              }
+              return 100;
+            });
           }
-
-          return "";
-        }}
-        sortObjectKeys={(key) => {
-          switch (key) {
-            case "id":
-              return 1;
-            case "type":
-              return 2;
-            case "label":
-              return 3;
-            case "required":
-              return 4;
-          }
-          return 100;
         }} />
     {/if}
   </div>
+  {#if !ready}
+    <div class="overlay" out:fade><Loading /></div>
+  {/if}
 </section>
 
 <style>
   :global(main) {
-    background: linear-gradient(135deg, hsl(22deg, 9%, 98%), hsl(19deg 50% 70%))
-      fixed;
+    background: linear-gradient(135deg, #f3f4f5, #d3dff3);
     position: relative;
-    color: #a75b37;
+    color: #151515;
   }
 
   .group {
@@ -946,9 +987,19 @@
 
   h1 {
     font-size: calc((1vh + 1vw) * 2.5);
-    text-transform: uppercase;
+    font-weight: 700;
     font-weight: 1000;
+    color: #231f20;
     margin: 0 0 calc((1vh + 1vw) * 0.2) calc((1vh + 1vw) * 1.5);
+  }
+
+  h1:after {
+    content: ".";
+    color: #f05a22;
+  }
+
+  h4 {
+    color: #db3c00;
   }
 
   .tip p {
@@ -962,8 +1013,8 @@
   .tip :global(sup) {
     display: inline-block;
     border-style: solid;
-    color: #a75b37;
-    border-color: #a75b37;
+    color: #db3c00;
+    border-color: #db3c00;
     font-weight: 600;
     padding: calc((1vh + 1vw) * 0.05) calc((1vh + 1vw) * 0.1);
     font-size: 0.85em;
@@ -982,6 +1033,7 @@
     min-height: calc((1vh + 1vw) * 20);
     border-radius: calc((1vh + 1vw) * 0.5);
     overflow: hidden;
+    background: linear-gradient(90deg, #c2c7cf, #dde0e4);
   }
 
   .kml {
@@ -1024,20 +1076,14 @@
   }
 
   label {
-    color: #a75b37;
-    border: #a75b37 calc((1vh + 1vw) * 0.05) solid;
+    color: inherit;
     font-weight: 700;
     border-radius: calc((1vh + 1vw) * 0.5) / calc((1vh + 1vw) * 1);
-    font-size: calc((1vh + 1vw) * 0.6);
+    font-size: calc((1vh + 1vw) * 0.5);
     place-items: center;
     transition: 0.4s cubic-bezier(0, 0, 0, 1);
     text-transform: uppercase;
     min-height: calc((1vh + 1vw) * 1.5);
-  }
-
-  label:hover {
-    box-shadow: #a75b37 0 calc((1vh + 1vw) * 0.1) calc((1vh + 1vw) * 1);
-    background: hsl(19deg 74% 78%);
   }
 
   label span {
@@ -1047,19 +1093,22 @@
   button {
     border: none;
     outline: none;
-    background: none;
-    border: #a75b37 calc((1vh + 1vw) * 0.05) solid;
+    cursor: pointer;
     height: calc((1vh + 1vw) * 1.5);
     padding: 0 calc((1vh + 1vw) * 0.5);
-    font-size: calc((1vh + 1vw) * 0.6);
+    font-size: calc((1vh + 1vw) * 0.5);
     font-weight: 700;
-    border-radius: calc((1vh + 1vw) * 0.5) / calc((1vh + 1vw) * 1);
-    color: #a75b37;
-    fill: #a75b37;
+    border-radius: calc((1vh + 1vw) * 100);
+    color: rgb(255, 255, 255);
+    fill: rgb(255, 255, 255);
     margin: 0 0 0 calc((1vh + 1vw) * 0.5);
     font-family: inherit;
     transition: 0.4s cubic-bezier(0, 0, 0, 1);
     text-transform: uppercase;
+    background: rgb(219, 60, 0);
+    box-shadow: rgb(244 92 35 / 14%) 0px 8px 14px 2px,
+      rgb(244 92 35 / 12%) 0px 6px 20px 5px,
+      rgb(244 92 35 / 20%) 0px 8px 10px -5px;
   }
 
   button:focus {
@@ -1067,14 +1116,12 @@
   }
 
   button:hover:not(:disabled) {
-    box-shadow: #a75b37 0 calc((1vh + 1vw) * 0.1) calc((1vh + 1vw) * 1);
-    background: hsl(19deg 74% 78%);
-    cursor: pointer;
+    background: rgb(149, 48, 0);
   }
 
   button:disabled {
-    border-color: hsl(21deg 9% 48%);
-    background: hsl(21deg 9% 48%);
+    border-color: hsl(16, 80%, 43%);
+    background: hsl(16, 80%, 43%);
     color: hsla(22deg, 9%, 98%, 55%);
     cursor: not-allowed;
   }
@@ -1087,11 +1134,10 @@
   select {
     flex: 1;
     outline: none;
-    color: #a75b37;
+    color: #db3c00;
     font-size: calc((1vh + 1vw) * 0.6);
     font-family: inherit;
     font-weight: 600;
-    border-radius: calc((1vh + 1vw) * 0.5) / calc((1vh + 1vw) * 1);
     background: none;
     height: 100%;
     border: none;
@@ -1099,33 +1145,29 @@
     transition: 0.4s cubic-bezier(0, 0, 0, 1);
   }
 
-  select:hover {
-    background: hsl(19deg 74% 78%);
-  }
-
   input[type="checkbox"] {
     display: none;
   }
 
   input[type="checkbox"] + .checkbox {
-    height: calc((1vh + 1vw) * 1);
-    width: calc((1vh + 1vw) * 1);
+    height: calc((1vh + 1vw) * 0.8);
+    width: calc((1vh + 1vw) * 0.8);
     background: none;
-    border: #a75b37 calc((1vh + 1vw) * 0.05) solid;
+    border: #db3c00 calc((1vh + 1vw) * 0.05) solid;
     border-radius: calc((1vh + 1vw) * 0.2);
-    margin: 0 calc((1vh + 1vw) * 0.5);
+    margin: 0 calc((1vh + 1vw) * 0.2);
   }
 
   input[type="checkbox"]:hover:not(:checked) + .checkbox {
-    background: #b18b7a !important;
+    background: hsl(16, 100%, 63%) !important;
   }
 
   input[type="checkbox"]:hover + .checkbox {
-    background: #855e4b !important;
+    background: hsl(16, 80%, 68%) !important;
   }
 
   input[type="checkbox"]:checked + .checkbox {
-    background: #7c523f;
+    background: #db3c00;
   }
 
   .checkboxLabel {
@@ -1150,12 +1192,19 @@
 
   input[type="password"]:focus,
   input[type="text"]:focus {
-    border-color: #a75b37;
+    border-color: #db3c00;
+  }
+
+  .tips {
+    color: #231f20;
+  }
+
+  .tips h2 {
+    color: #db3c00;
   }
 
   .result {
     flex: 0.5;
     padding: 0 0 calc((1vh + 1vw) * 1) calc((1vh + 1vw) * 0.5);
-    color: #6e4f40;
   }
 </style>

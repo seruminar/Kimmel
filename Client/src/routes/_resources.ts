@@ -1,7 +1,7 @@
 export default {
   en_us: {
     translation: {
-      kimmel: "KIMMEL",
+      kimmel: "Kimmel",
       kmlInTheBox: "Write KML here...",
       strict: "Strict",
       parse: "Parse",
@@ -10,11 +10,11 @@ export default {
       parsedKml: "Parsed KML JSON",
       genericError: "Error",
       parsedKmlError: "Parsing error",
-      exportIntoProject: "Import KML into a Kontent project",
+      exportIntoProject: "Export your KML into a Kontent project",
       exportDescription:
         "Create content types according to the KML schema, if it is valid.",
       managementApiKey: "Management API key",
-      exported: "KML successfully imported into project",
+      exported: "KML successfully exported into the Kontent project",
       exportSuccess:
         "The content models you have defined are now in your project! Check them out by clicking the link below.",
       openTypes: "Open Content model in Kontent",
@@ -44,7 +44,7 @@ export default {
       newTemplateNameExists:
         "That template name already exists! If you proceed, you will save over the existing template.",
       newTemplateNameExistsAsDefault:
-        "That template name already existsas a default template. You cannot save over default templates.",
+        "That template name already exists as a default template. You cannot save over default templates.",
     },
   },
 };

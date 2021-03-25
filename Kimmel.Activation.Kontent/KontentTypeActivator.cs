@@ -207,7 +207,14 @@ namespace Kimmel.Activation.Kontent
 
                             if (richTextPropertyDescription.Components)
                             {
-                                allowedBlocks.Add(RichTextElement.Block.ComponentsAndItems);
+                                if (allowedBlocks.Count == 3)
+                                {
+                                    allowedBlocks.Clear();
+                                }
+                                else
+                                {
+                                    allowedBlocks.Add(RichTextElement.Block.ComponentsAndItems);
+                                }
                             }
 
                             var allowedTextBlocks = new List<RichTextElement.TextBlock>(7);
@@ -244,7 +251,14 @@ namespace Kimmel.Activation.Kontent
 
                             if (richTextPropertyDescription.Ul)
                             {
-                                allowedTextBlocks.Add(RichTextElement.TextBlock.UnorderedList);
+                                if (allowedTextBlocks.Count == 6)
+                                {
+                                    allowedTextBlocks.Clear();
+                                }
+                                else
+                                {
+                                    allowedTextBlocks.Add(RichTextElement.TextBlock.UnorderedList);
+                                }
                             }
 
                             var allowedFormatting = new List<RichTextElement.Formatting>(7) { RichTextElement.Formatting.Unstyled };
@@ -278,10 +292,10 @@ namespace Kimmel.Activation.Kontent
 
                             if (richTextPropertyDescription.TablesImages)
                             {
-                                allowedTableBlocks.Add(RichTextElement.TableBlock.Images);
+                                allowedTableBlocks.Clear();
                             }
 
-                            var allowedTableTextBlocks = new List<RichTextElement.TextBlock>();
+                            var allowedTableTextBlocks = new List<RichTextElement.TextBlock>(7);
 
                             if (richTextPropertyDescription.TablesP)
                             {
@@ -315,7 +329,14 @@ namespace Kimmel.Activation.Kontent
 
                             if (richTextPropertyDescription.TablesUl)
                             {
-                                allowedTableTextBlocks.Add(RichTextElement.TextBlock.UnorderedList);
+                                if (allowedTableTextBlocks.Count == 6)
+                                {
+                                    allowedTableTextBlocks.Clear();
+                                }
+                                else
+                                {
+                                    allowedTableTextBlocks.Add(RichTextElement.TextBlock.UnorderedList);
+                                }
                             }
 
                             var allowedTableFormatting = new List<RichTextElement.Formatting>(7) { RichTextElement.Formatting.Unstyled };
@@ -365,6 +386,7 @@ namespace Kimmel.Activation.Kontent
                         {
                             elements.Add(new CustomElement()
                             {
+                                Source_url = "https://custom",
                                 Is_required = customPropertyDescription.Required,
                                 Name = customPropertyDescription.Label
                             });
